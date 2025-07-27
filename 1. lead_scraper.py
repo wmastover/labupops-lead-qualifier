@@ -11,6 +11,7 @@ import argparse
 from typing import List, Dict, Optional
 import googlemaps
 from datetime import datetime
+import time
 
 # Try to load .env file if python-dotenv is available
 try:
@@ -26,14 +27,14 @@ class PlacesFetcher:
         self.gmaps = googlemaps.Client(key=api_key)
     
     def search_places(self, town_name: str, place_type: Optional[str] = None, 
-                     radius: int = 50000) -> List[Dict]:
+                     radius: int = 2000) -> List[Dict]:
         """
         Search for places in a given town.
         
         Args:
             town_name: Name of the town to search in
-            place_type: Type of place to search for (e.g., 'restaurant', 'hospital')
-            radius: Search radius in meters (default: 50km)
+            place_type: Type of place to search for (default: searches for restaurants and takeaways)
+            radius: Search radius in meters (default: 2km)
         
         Returns:
             List of place dictionaries
@@ -49,32 +50,62 @@ class PlacesFetcher:
             
             print(f"Found coordinates for {town_name}: {lat}, {lng}")
             
-            # Search for places nearby
-            if place_type:
+            all_places = []
+            
+            # If no specific type provided, search for restaurants and takeaways
+            if place_type is None:
+                # Search for multiple food-related types
+                food_types = ['restaurant', 'meal_takeaway',]
+                for food_type in food_types:
+                    print(f"Searching for {food_type}...")
+                    places_result = self.gmaps.places_nearby(
+                        location=(lat, lng),
+                        radius=radius,
+                        type=food_type
+                    )
+                    
+                    places = places_result.get('results', [])
+                    print(f"Found {len(places)} {food_type} places")
+                    
+                    # Get additional pages if available
+                    while 'next_page_token' in places_result:
+                        time.sleep(2)  # Required delay for next page token
+                        places_result = self.gmaps.places_nearby(
+                            page_token=places_result['next_page_token']
+                        )
+                        places.extend(places_result.get('results', []))
+                    
+                    all_places.extend(places)
+                
+                # Remove duplicates based on place_id
+                unique_places = {}
+                for place in all_places:
+                    place_id = place.get('place_id')
+                    if place_id and place_id not in unique_places:
+                        unique_places[place_id] = place
+                
+                places = list(unique_places.values())
+                print(f"Total unique food establishments found: {len(places)}")
+                
+            else:
+                # Search for the specified type
                 places_result = self.gmaps.places_nearby(
                     location=(lat, lng),
                     radius=radius,
                     type=place_type
                 )
-            else:
-                # If no specific type, search for general places
-                places_result = self.gmaps.places_nearby(
-                    location=(lat, lng),
-                    radius=radius
-                )
-            
-            places = places_result.get('results', [])
-            print(f"Found {len(places)} places")
-            
-            # Get additional pages if available
-            while 'next_page_token' in places_result:
-                import time
-                time.sleep(2)  # Required delay for next page token
-                places_result = self.gmaps.places_nearby(
-                    page_token=places_result['next_page_token']
-                )
-                places.extend(places_result.get('results', []))
-                print(f"Total places found: {len(places)}")
+                
+                places = places_result.get('results', [])
+                print(f"Found {len(places)} places")
+                
+                # Get additional pages if available
+                while 'next_page_token' in places_result:
+                    time.sleep(2)  # Required delay for next page token
+                    places_result = self.gmaps.places_nearby(
+                        page_token=places_result['next_page_token']
+                    )
+                    places.extend(places_result.get('results', []))
+                    print(f"Total places found: {len(places)}")
             
             return places
             
@@ -89,7 +120,7 @@ class PlacesFetcher:
                 place_id=place_id,
                 fields=['name', 'formatted_address', 'formatted_phone_number', 
                        'website', 'rating', 'user_ratings_total', 'business_status',
-                       'opening_hours', 'price_level', 'types']
+                       'opening_hours', 'price_level', 'type']
             )
             return details.get('result', {})
         except Exception as e:
@@ -174,14 +205,14 @@ class PlacesFetcher:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Fetch places from Google Places API and export to CSV'
+        description='Fetch restaurants and takeaways from Google Places API and export to CSV'
     )
     parser.add_argument('town_name', help='Name of the town to search in')
     parser.add_argument('--api-key', help='Google Maps API key (or set GOOGLE_MAPS_API_KEY env var)')
     parser.add_argument('--output', '-o', default='places.csv', help='Output CSV filename')
-    parser.add_argument('--type', help='Type of place to search for (e.g., restaurant, hospital)')
-    parser.add_argument('--radius', type=int, default=50000, 
-                       help='Search radius in meters (default: 50000)')
+    parser.add_argument('--type', help='Type of place to search for (default: restaurants and takeaways). Options: restaurant, meal_takeaway, food, etc.')
+    parser.add_argument('--radius', type=int, default=2000, 
+                       help='Search radius in meters (default: 2000 = 2km)')
     parser.add_argument('--details', action='store_true', 
                        help='Fetch detailed information for each place (slower)')
     
@@ -214,12 +245,14 @@ def main():
     # Set filename based on town name if not specified
     if args.output == 'places.csv':
         clean_town_name = args.town_name.replace(" ", "_").replace(",", "").replace(".", "")
-        args.output = os.path.join(lead_lists_dir, f'{clean_town_name}.csv')
+        args.output = os.path.join(lead_lists_dir, f'{clean_town_name}_restaurants.csv')
     
-    print(f"Searching for places in: {args.town_name}")
+    print(f"Searching for food establishments in: {args.town_name}")
     if args.type:
         print(f"Place type: {args.type}")
-    print(f"Search radius: {args.radius}m")
+    else:
+        print("Place types: restaurants, takeaways, and food establishments")
+    print(f"Search radius: {args.radius}m ({args.radius/1000}km)")
     print(f"Output file: {args.output}")
     print(f"Include details: {args.details}")
     print("-" * 50)
@@ -234,7 +267,7 @@ def main():
     if places:
         # Export to CSV
         fetcher.export_to_csv(places, args.output, include_details=args.details)
-        print(f"\nSuccess! {len(places)} places exported to {args.output}")
+        print(f"\nSuccess! {len(places)} food establishments exported to {args.output}")
     else:
         print("No places found or error occurred.")
         sys.exit(1)
