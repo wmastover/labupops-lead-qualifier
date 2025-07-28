@@ -136,44 +136,62 @@ class EmailFinderAgent:
         print(f"\n🔍 Searching for contact info: {restaurant_name}")
         print(f"URL: {url}")
         
-        # Create enhanced task for comprehensive contact info
+        # Create enhanced granular task for comprehensive contact info
         task = f"""
-        Visit the website {url} for {restaurant_name} and find ALL their contact information.
+        Visit the website {url} for {restaurant_name} and systematically find ALL their contact information using this step-by-step approach:
+
+        **STEP 1: Homepage Email Search**
+        First, carefully examine the homepage for any email addresses:
+        - Look in the header navigation
+        - Check the footer section thoroughly
+        - Look for any "Contact" or "Email" text
+        - Check for any mailto: links
+        - Look in the main content area
+        - Check any contact sections or boxes
         
-        Please thoroughly search for:
-        1. **Email addresses** - Look for:
-           - Contact/Contact Us page
-           - Footer section  
-           - About page
-           - Header navigation
-           - Any mailto: links
+        **STEP 2: About Page Search (if exists)**
+        If there's an "About", "About Us", or "Our Story" page:
+        - Navigate to that page
+        - Look for owner/manager email addresses
+        - Check for team contact information
+        - Look for business inquiry emails
         
-        2. **Phone numbers** - Look for:
-           - Main contact number
-           - Reservation/booking numbers
-           - Different department numbers
-           
-        3. **Physical address** - Look for:
-           - Full street address
-           - Location/Find Us page
-           - Footer information
-           
-        4. **Contact forms** - Look for:
-           - Contact Us forms
-           - Get In Touch forms
-           - Reservation/Booking forms
-           - Feedback forms
-           
-        **IMPORTANT**: When you have found all the contact information, you MUST call the 'extract_contact_info' function with all the details you found. Use the structured format to provide:
-        - email: The primary/main email address
-        - phone: The primary/main phone number  
+        **STEP 3: Contact Page Search (if exists)**
+        If there's a "Contact", "Contact Us", or "Get in Touch" page:
+        - Navigate to that page
+        - Look for all email addresses listed
+        - Check for department-specific emails
+        - Look for contact forms and note their URLs
+        
+        **STEP 4: Additional Contact Information**
+        While on these pages, also collect:
+        - Phone numbers (main, reservations, takeaway)
+        - Physical addresses (complete street address)
+        - Contact form URLs
+        
+        **STEP 5: Final Sweep**
+        Do a final check of any other obvious pages like:
+        - "Location" or "Find Us" pages
+        - "Reservations" or "Bookings" pages
+        - Any footer links you haven't checked
+        
+        **IMPORTANT INSTRUCTIONS:**
+        - Be methodical - check each page section by section
+        - Don't rush - emails are often hidden in footers or small text
+        - Look for text like "Email us at:", "Contact:", "Write to us:"
+        - Check both visible text and any links (mailto: links)
+        - When you find contact information, immediately note it down
+        
+        **WHEN COMPLETE:** You MUST call the 'extract_contact_info' function with ALL the details you found:
+        - email: The primary/best email address found
+        - phone: The primary phone number
         - address: The complete physical address
         - contact_form_url: Full URL to any contact form
         - additional_emails: List of any other emails found
         - additional_phones: List of any other phone numbers found
-        - notes: Any other relevant contact information
+        - notes: Which pages you found information on and any other relevant details
         
-        Do not just describe what you found - call the extract_contact_info function!
+        Do not just describe what you found - you must call the extract_contact_info function with the structured data!
         """
         
         try:
