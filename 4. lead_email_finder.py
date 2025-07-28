@@ -126,7 +126,6 @@ class EmailFinderAgent:
         print(f"\n🔍 Searching for contact info: {restaurant_name}")
         print(f"URL: {url}")
         
-<<<<<<< HEAD
         # Create enhanced granular task for comprehensive contact info
         task = f"""
         Visit the website {url} for {restaurant_name} and systematically find ALL their contact information using this step-by-step approach:
