@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Lead Contact Finder - Step 4
-Uses browser-use to automatically find complete contact information for restaurants with outdated websites.
-Collects: emails, phone numbers, addresses, and contact form links.
+Uses browser-use to automatically find email contact information for restaurants with outdated websites.
+Collects: emails and contact form links.
 """
 
 import asyncio
@@ -26,11 +26,8 @@ load_dotenv()
 class ContactInfo(BaseModel):
     """Structured model for restaurant contact information"""
     email: Optional[str] = Field(default=None, description="Primary contact email address")
-    phone: Optional[str] = Field(default=None, description="Primary phone number")
-    address: Optional[str] = Field(default=None, description="Physical address")
     contact_form_url: Optional[str] = Field(default=None, description="URL to contact/get-in-touch form if available")
     additional_emails: list[str] = Field(default_factory=list, description="Any additional email addresses found")
-    additional_phones: list[str] = Field(default_factory=list, description="Any additional phone numbers found")
     notes: Optional[str] = Field(default=None, description="Any additional notes about contact methods")
 
 # Create controller and register custom action
@@ -47,11 +44,8 @@ async def extract_contact_info(params: ContactInfo, page: Page) -> ActionResult:
     # Convert the contact info to a structured result
     contact_data = {
         'email': params.email,
-        'phone': params.phone, 
-        'address': params.address,
         'contact_form_url': params.contact_form_url,
         'additional_emails': params.additional_emails,
-        'additional_phones': params.additional_phones,
         'notes': params.notes,
         'page_url': page.url
     }
@@ -60,10 +54,6 @@ async def extract_contact_info(params: ContactInfo, page: Page) -> ActionResult:
     summary_parts = []
     if params.email:
         summary_parts.append(f"Email: {params.email}")
-    if params.phone:
-        summary_parts.append(f"Phone: {params.phone}")
-    if params.address:
-        summary_parts.append(f"Address: {params.address}")
     if params.contact_form_url:
         summary_parts.append(f"Contact form: {params.contact_form_url}")
     
@@ -136,41 +126,28 @@ class EmailFinderAgent:
         print(f"\n🔍 Searching for contact info: {restaurant_name}")
         print(f"URL: {url}")
         
-        # Create enhanced task for comprehensive contact info
+        # Create simplified task for email and contact form finding
         task = f"""
-        Visit the website {url} for {restaurant_name} and find ALL their contact information.
+        Visit the website {url} for {restaurant_name} and find their email contact information and contact forms.
         
-        Please thoroughly search for:
-        1. **Email addresses** - Look for:
+        Please search for:
+        1. **Email addresses** - Look in:
            - Contact/Contact Us page
            - Footer section  
            - About page
            - Header navigation
            - Any mailto: links
         
-        2. **Phone numbers** - Look for:
-           - Main contact number
-           - Reservation/booking numbers
-           - Different department numbers
-           
-        3. **Physical address** - Look for:
-           - Full street address
-           - Location/Find Us page
-           - Footer information
-           
-        4. **Contact forms** - Look for:
+        2. **Contact forms** - Look for:
            - Contact Us forms
            - Get In Touch forms
            - Reservation/Booking forms
            - Feedback forms
            
-        **IMPORTANT**: When you have found all the contact information, you MUST call the 'extract_contact_info' function with all the details you found. Use the structured format to provide:
+        **IMPORTANT**: When you have found the contact information, you MUST call the 'extract_contact_info' function with the details you found. Use the structured format to provide:
         - email: The primary/main email address
-        - phone: The primary/main phone number  
-        - address: The complete physical address
         - contact_form_url: Full URL to any contact form
         - additional_emails: List of any other emails found
-        - additional_phones: List of any other phone numbers found
         - notes: Any other relevant contact information
         
         Do not just describe what you found - call the extract_contact_info function!
@@ -206,17 +183,14 @@ class EmailFinderAgent:
                 'judgment': restaurant_data.get('judgment', ''),
                 'confidence': restaurant_data.get('confidence', ''),
                 
-                # New comprehensive contact fields
+                # Contact information found
                 'email': contact_info.get('email'),
-                'phone': contact_info.get('phone'),
-                'address': contact_info.get('address'),
                 'contact_form_url': contact_info.get('contact_form_url'),
                 'additional_emails': '; '.join(contact_info.get('additional_emails', [])) if contact_info.get('additional_emails') else None,
-                'additional_phones': '; '.join(contact_info.get('additional_phones', [])) if contact_info.get('additional_phones') else None,
                 'contact_notes': contact_info.get('notes'),
                 
                 'search_timestamp': datetime.now().isoformat(),
-                'search_status': 'success' if contact_info.get('email') or contact_info.get('phone') else 'no_contact_found',
+                'search_status': 'success' if contact_info.get('email') or contact_info.get('contact_form_url') else 'no_contact_found',
                 'agent_steps': len(history.model_actions()) if history else 0,
                 'urls_visited': len(history.urls()) if history else 0,
             }
@@ -234,11 +208,8 @@ class EmailFinderAgent:
                 'judgment': restaurant_data.get('judgment', ''),
                 'confidence': restaurant_data.get('confidence', ''),
                 'email': None,
-                'phone': None,
-                'address': None,
                 'contact_form_url': None,
                 'additional_emails': None,
-                'additional_phones': None,
                 'contact_notes': None,
                 'search_timestamp': datetime.now().isoformat(),
                 'search_status': 'error',
@@ -310,24 +281,6 @@ class EmailFinderAgent:
             elif emails:
                 contact_info['email'] = emails[0]
         
-        # Extract phone numbers (basic patterns)
-        phone_patterns = [
-            r'\b(?:\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})\b',
-            r'\b\d{11}\b',
-            r'\b\d{10}\b'
-        ]
-        
-        phones = []
-        for pattern in phone_patterns:
-            matches = re.findall(pattern, result_text)
-            if matches:
-                phones.extend([''.join(match) if isinstance(match, tuple) else match for match in matches])
-        
-        if phones:
-            contact_info['phone'] = phones[0]
-            if len(phones) > 1:
-                contact_info['additional_phones'] = phones[1:]
-        
         return contact_info
     
     async def process_all_restaurants(self):
@@ -390,8 +343,6 @@ class EmailFinderAgent:
         print("\n📊 CONTACT SEARCH SUMMARY:")
         print(f"Total restaurants processed: {len(df)}")
         print(f"Emails found: {len(df[df['email'].notna()])}")
-        print(f"Phone numbers found: {len(df[df['phone'].notna()])}")
-        print(f"Addresses found: {len(df[df['address'].notna()])}")
         print(f"Contact forms found: {len(df[df['contact_form_url'].notna()])}")
         print(f"No contact info found: {len(df[df['search_status'] == 'no_contact_found'])}")
         print(f"Errors: {len(df[df['search_status'] == 'error'])}")
@@ -404,8 +355,6 @@ class EmailFinderAgent:
                 contact_parts = []
                 if row['email']:
                     contact_parts.append(f"Email: {row['email']}")
-                if row['phone']:
-                    contact_parts.append(f"Phone: {row['phone']}")
                 if row['contact_form_url']:
                     contact_parts.append(f"Form: {row['contact_form_url']}")
                 
@@ -437,8 +386,6 @@ async def test_single_url():
     print(f"Restaurant: {result['restaurant_name']}")
     print(f"URL: {result['url']}")
     print(f"Email: {result['email']}")
-    print(f"Phone: {result['phone']}")
-    print(f"Address: {result['address']}")
     print(f"Contact Form: {result['contact_form_url']}")
     print(f"Status: {result['search_status']}")
     print(f"Agent steps: {result['agent_steps']}")
